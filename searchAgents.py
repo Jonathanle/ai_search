@@ -426,21 +426,33 @@ def cornersHeuristic(state, problem):
     nearest_corner_dist = min(distances) if distances else 0
 
     # Calculate MST cost for remaining unvisited corners
-    mst_cost = calculate_mst_cost(unvisited_corners)
+    mst_cost = calculate_total_dist_cost(unvisited_corners)
+
+
+    # Right now - representation task how to think about it + organize
+
+    # TODO: Consider the mechanimsm behind how a heuristic helps to cut the state space or "prioritize other paths over others"
+    # Framework 1 - Speed of the bots + order of exploration - I have to go down path
+    # heuristics increase the velocity of more by "increasing" the speed of exploration, if i "slow" down the speed of exploration, 
+    # then the algortihm can not be admissible, and the slowest paths willb e found first.
 
     return nearest_corner_dist + mst_cost # go too nearest corner + how do I best choose a path or ordering of the 4 points that allows me to traverse as small of a path around? 
 
 def manhattan_distance(pos1, pos2):
     return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
 
-def calculate_mst_cost(corners):
-    # calculate the minimum spanning tree for finding hte shortest distance, useful and efficietn for lower points.
+def calculate_total_dist_cost(corners):
+    # function to approximate the additional total distance to a given point.
+    # Calculates the manhattan distance by considering other possible pairwise points, that we can travel.
+    # ---> --> --> total dist cost, accounts for long term alongside the greedy heuristic
+
+
     if len(corners) <= 1:
         return 0
     elif len(corners) == 2:
-        return manhattan_distance(corners[0], corners[1])
+        return manhattan_distance(corners[0], corners[1]) # sum up the closest distance
     elif len(corners) == 3:
-        dist01 = manhattan_distance(corners[0], corners[1])
+        dist01 = manhattan_distance(corners[0], corners[1]) # approximate the total distance I need to travel
         dist02 = manhattan_distance(corners[0], corners[2])
         dist12 = manhattan_distance(corners[1], corners[2])
         return min(dist01 + dist02, dist01 + dist12, dist02 + dist12)
