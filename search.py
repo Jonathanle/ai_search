@@ -127,12 +127,17 @@ def depthFirstSearch(problem):
         successors = problem.getSuccessors(state)
         successors.reverse()
 
-        for (x,y), direction, stepCost in successors: 
-            if (x,y) in visited: 
+    
+    
+
+        # idea 1 - I expected the successor to always mean
+        # changed the output to always mean the identifier. 
+        for successor, direction, stepCost in successors: 
+            if successor in visited: 
                 continue
 
-            prev[(x,y)] = (state, direction, stepCost) # at this stage, we always "build" a bigger path that will be considered as part of the solution.
-            finish_state = find_finish_state((x,y))
+            prev[successor] = (state, direction, stepCost) # at this stage, we always "build" a bigger path that will be considered as part of the solution.
+            finish_state = find_finish_state(successor)
 
     
             if finish_state != -1: 
@@ -201,7 +206,7 @@ def breadthFirstSearch(problem):
                         # Get the previous working key
                         working_state = prev[working_state][0]
 
-        print(f"move_list: {move_list} len: {len(move_list)}")
+        #print(f"move_list: {move_list} len: {len(move_list)}")
         return move_list            
 
 
@@ -227,14 +232,14 @@ def breadthFirstSearch(problem):
         working_node = Q.pop(0)
         
 
-        print(f"Working Node: {working_node}")
+        #print(f"Working Node: {working_node}")
         visited.add(working_node)
         if problem.isGoalState(working_node):
             
             return reconstruct_list(prev, working_node)
         
-        for (x,y), direction, stepCost in problem.getSuccessors(working_node): 
-            if (x,y) in visited: 
+        for successor, direction, stepCost in problem.getSuccessors(working_node): 
+            if successor in visited: 
                 continue
             # heuristic - I add visited here to allow algorithm to later on not add to the Q
             # visited = already "seen" and considered into the solution will be traversed on the Q. 
@@ -242,10 +247,10 @@ def breadthFirstSearch(problem):
 
 
             #visited.add((x,y))
-            prev[(x,y)] = (working_node, direction, stepCost)
+            prev[successor] = (working_node, direction, stepCost)
 
-            visited.add((x,y))
-            Q.append((x,y))
+            visited.add(successor)
+            Q.append(successor)
          
     return []
 
@@ -259,12 +264,18 @@ def uniformCostSearch(problem):
     """Search the node of least total cost first."""
     "*** YOUR CODE HERE ***"
 
+    # Misleading 
+
 
     def reconstruct_list(prev, finish_state):
         """
         Creates the move path from the tuple
         """
+
+        # I suspect that thing wrong is made in the new thing 
         move_list = []
+        
+
 
         working_state = finish_state
 
@@ -284,7 +295,12 @@ def uniformCostSearch(problem):
     visited = set()
     Q = PriorityQueue()
 
+    min_distance = {}
 
+    # Error - I was not using the cumulative cost. for alll paths I want to explore by examining up to a certain point
+    # what paths I have explored is. 
+    # previously, I was just computing / dequeueing what was the lowest cost edge as a model, but dequqing on lowest cost edge 
+    # attatched to a minimum node, on the queue made it ideal. 
     
 
 
@@ -293,28 +309,67 @@ def uniformCostSearch(problem):
 
     Q.push(start, 1) # priority does not matter
     visited.add(start)
+    min_distance[start] = 0
 
     
 
     while not Q.isEmpty():
-
+    
         working_node = Q.pop()
-        
+
+        #visited.add(working_node) # we define visited now to not mean 'noted' but that it has been dequeued and will not be touched, it has the min value.  
+        # this one is added badly this error caused a node to be added multiple times.
+
         if problem.isGoalState(working_node):
-            
             return reconstruct_list(prev, working_node)
         
-        for (x,y), direction, stepCost in problem.getSuccessors(working_node): 
-            if (x,y) in visited: 
-                continue
+        for successor, direction, stepCost in problem.getSuccessors(working_node): 
+            #if successor in visited: # change visited to mean that I won't change anything about it. 
+            #    continue
+
+            # Check to create new discovered nodes as inf if not discovered
+            if successor not in min_distance:
+                min_distance[successor] = float('inf')
+
+            # check if there is already a prev add the current node as the highest cost. 
+            # I need to handle the special case for having the start as successor.
+            if successor not in prev and successor != start: # discovered this as I realized in references that there was an infinite loop, leading to references.
+                prev[successor] = (working_node, direction, stepCost)
+
+
+
             # heuristic - I add visited here to allow algorithm to later on not add to the Q
             # visited = already "seen" and considered into the solution will be traversed on the Q. 
             # visited === 'noted'
 
-            prev[(x,y)] = (working_node, direction, stepCost)
+            # I don't want to immediately change this, on what condition should I add a prev? 
+            # 1. if there is no prev -> add a prev. 
+            # 2. if there is a prev -> 
+            #prev[successor] = (working_node, direction, stepCost)
 
-            visited.add((x,y))
-            Q.push((x,y), stepCost)
+            assert working_node in min_distance, "Error working_node is not in min distance"
+
+            # problem 1 address the changing prev. 
+            # address the decisoin problem.
+
+       
+
+            new_min_distance = stepCost + min_distance[working_node] #--> if there was already a tentative difference, then we never hold tthat under condition 
+            # repeating F problem.
+            if new_min_distance < min_distance[successor]: 
+                 min_distance[successor] = new_min_distance
+                 prev[successor] = (working_node, direction, stepCost)
+                
+
+           
+
+            # now visited here does not make sense as essentially I am boxing myself in and not allowing further exploration.
+            if successor not in visited: 
+                # visited == I have seen it and there is now a new value.
+                # if I dequeue this "visited" node then I have found the min value.
+        
+                Q.push(successor, min_distance[successor])
+                visited.add(successor)
          
     return []
     util.raiseNotDefined()
@@ -328,18 +383,18 @@ def nullHeuristic(state, problem=None):
 
 
 def aStarSearch(problem, heuristic=nullHeuristic):
-    """Search the node that has the lowest combined cost and heuristic first."""
-    "*** YOUR CODE HERE ***"
 
-
-    # when visiting nodes, rewrite my UCS function to incorporate greedy information. 
-
-
+    print("running:")
+    # Figure out how to create thi squeeu.
     def reconstruct_list(prev, finish_state):
         """
         Creates the move path from the tuple
         """
+
+        # I suspect that thing wrong is made in the new thing 
         move_list = []
+        
+
 
         working_state = finish_state
 
@@ -351,6 +406,7 @@ def aStarSearch(problem, heuristic=nullHeuristic):
                         # Get the previous working key
                         working_state = prev[working_state][0]
 
+        print(move_list)
         return move_list            
 
 
@@ -359,7 +415,12 @@ def aStarSearch(problem, heuristic=nullHeuristic):
     visited = set()
     Q = PriorityQueue()
 
+    min_distance = {}
 
+    # Error - I was not using the cumulative cost. for alll paths I want to explore by examining up to a certain point
+    # what paths I have explored is. 
+    # previously, I was just computing / dequeueing what was the lowest cost edge as a model, but dequqing on lowest cost edge 
+    # attatched to a minimum node, on the queue made it ideal. 
     
 
 
@@ -368,32 +429,109 @@ def aStarSearch(problem, heuristic=nullHeuristic):
 
     Q.push(start, 1) # priority does not matter
     visited.add(start)
+    min_distance[start] = 0
 
     
 
     while not Q.isEmpty():
 
+
+        if len(min_distance) < 20:
+            print(min_distance)
+    
         working_node = Q.pop()
-        
+
+        #visited.add(working_node) # we define visited now to not mean 'noted' but that it has been dequeued and will not be touched, it has the min value.  
+        # this one is added badly this error caused a node to be added multiple times.
+
         if problem.isGoalState(working_node):
             
             return reconstruct_list(prev, working_node)
         
-        for (x,y), direction, stepCost in problem.getSuccessors(working_node): 
-            if (x,y) in visited: 
-                continue
+        for successor, direction, stepCost in problem.getSuccessors(working_node): 
+            #if successor in visited: # change visited to mean that I won't change anything about it. 
+            #    continue
+
+            # Check to create new discovered nodes as inf if not discovered
+            if successor not in min_distance:
+                min_distance[successor] = float('inf')
+
+            # check if there is already a prev add the current node as the highest cost. 
+            # I need to handle the special case for having the start as successor.
+            if successor not in prev and successor != start: # discovered this as I realized in references that there was an infinite loop, leading to references.
+                prev[successor] = (working_node, direction, stepCost)
+
+
+
             # heuristic - I add visited here to allow algorithm to later on not add to the Q
             # visited = already "seen" and considered into the solution will be traversed on the Q. 
             # visited === 'noted'
 
-            prev[(x,y)] = (working_node, direction, stepCost)
+            # I don't want to immediately change this, on what condition should I add a prev? 
+            # 1. if there is no prev -> add a prev. 
+            # 2. if there is a prev -> 
+            #prev[successor] = (working_node, direction, stepCost)
 
-            visited.add((x,y))
+            assert working_node in min_distance, "Error working_node is not in min distance"
 
-            # add the cost + the heuristical estimate between the goal the position.
+            # problem 1 address the changing prev. 
+            # address the decisoin problem.
 
-            estimated_distance = stepCost + heuristic((x,y), problem)    
-            Q.push((x,y), estimated_distance)
+            
+        
+            # distance encodes the whole cumulative cost to queue the smallest difference
+            new_min_distance = stepCost + min_distance[working_node] #+ heuristic(successor, problem) doesnt seem as convenient to calculate the min distance, true
+            
+            
+
+            if successor == 'G' and new_min_distance == 10:
+                #import pdb
+                #pdb.set_trace()
+                print(new_min_distance)
+                print("successor")
+                print(min_distance[successor])
+
+            # repeating F problem.
+            if new_min_distance < min_distance[successor]: 
+                 min_distance[successor] = new_min_distance
+                 prev[successor] = (working_node, direction, stepCost)
+
+                 if successor in visited:
+                    # recompute the cumulative cost and add the heuristic
+
+                    guessed_distance = min_distance[successor] + heuristic(successor, problem)
+
+                    Q.update(successor, guessed_distance)
+
+                
+
+           
+
+            # now visited here does not make sense as essentially I am boxing myself in and not allowing further exploration.
+
+
+            # issue related too visited - i only queue once when I visit with the heuristic. 
+            if successor not in visited: 
+                # visited == I have seen it and there is now a new value.
+                # if I dequeue this "visited" node then I have found the min value.
+                if len(min_distance) < 20: 
+                    print(f"{min_distance} in loop")
+                guessed_distance = min_distance[successor] + heuristic(successor, problem)
+                if successor == "A": 
+                    print(f"A: {guessed_distance}")
+                if successor == "C": 
+                     
+                     print(f"C: {guessed_distance} heuristic")
+                if successor == "D": 
+                     print(f"D: {guessed_distance}")
+                if successor == 'B': 
+                     print(f"B: {guessed_distance}")
+                if successor == 'G': 
+                     print(min_distance)
+                     print(f"{successor} {min_distance[successor]}")
+                
+                Q.push(successor, guessed_distance) # when G is pushed, it is pushed when the value is 10, but visited essentially prevents it from going again
+                visited.add(successor)
          
     return []
     util.raiseNotDefined()

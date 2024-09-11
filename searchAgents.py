@@ -419,6 +419,7 @@ def cornersHeuristic(state, problem):
         return 0
 
     # Calculate Manhattan distances to unvisited corners
+
     unvisited_corners = [corner for i, corner in enumerate(corners) if not visited_corners[i]]
     distances = [manhattan_distance(current_position, corner) for corner in unvisited_corners]
 
@@ -426,7 +427,7 @@ def cornersHeuristic(state, problem):
     nearest_corner_dist = min(distances) if distances else 0
 
     # Calculate MST cost for remaining unvisited corners
-    mst_cost = calculate_total_dist_cost(unvisited_corners)
+    approximate_additional_cost = calculate_total_dist_cost(unvisited_corners)
 
 
     # Right now - representation task how to think about it + organize
@@ -435,14 +436,20 @@ def cornersHeuristic(state, problem):
     # Framework 1 - Speed of the bots + order of exploration - I have to go down path
     # heuristics increase the velocity of more by "increasing" the speed of exploration, if i "slow" down the speed of exploration, 
     # then the algortihm can not be admissible, and the slowest paths willb e found first.
-
-    return nearest_corner_dist + mst_cost # go too nearest corner + how do I best choose a path or ordering of the 4 points that allows me to traverse as small of a path around? 
+    # somehow, the state space also uses mst to encourage better explloration of paths not encoded by position but by potential to have shorter distances
+    # still uses distance to encode, but this state space seems apparently more complex with the boolean array being encoded. 
+    print(approximate_additional_cost)
+    print(state[1])
+    return nearest_corner_dist + approximate_additional_cost # go too nearest corner + how do I best choose a path or ordering of the 4 points that allows me to traverse as small of a path around? 
 
 def manhattan_distance(pos1, pos2):
     return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
 
 def calculate_total_dist_cost(corners):
     # function to approximate the additional total distance to a given point.
+    # calculates and finds the minimum apprxoimate distance
+    # seems very related to the idea of choosing edges and a minimum path. 
+    # is this related to the "compactness" of the points? 
     # Calculates the manhattan distance by considering other possible pairwise points, that we can travel.
     # ---> --> --> total dist cost, accounts for long term alongside the greedy heuristic
 
@@ -455,7 +462,10 @@ def calculate_total_dist_cost(corners):
         dist01 = manhattan_distance(corners[0], corners[1]) # approximate the total distance I need to travel
         dist02 = manhattan_distance(corners[0], corners[2])
         dist12 = manhattan_distance(corners[1], corners[2])
-        return min(dist01 + dist02, dist01 + dist12, dist02 + dist12)
+        
+
+        # dist01 + dist12 omimtted, 
+        return min(dist01 + dist12, dist02 + dist12)
     else:  # 4 corners
         dist01 = manhattan_distance(corners[0], corners[1])
         dist02 = manhattan_distance(corners[0], corners[2])
@@ -463,9 +473,12 @@ def calculate_total_dist_cost(corners):
         dist12 = manhattan_distance(corners[1], corners[2])
         dist13 = manhattan_distance(corners[1], corners[3])
         dist23 = manhattan_distance(corners[2], corners[3])
-        return min(dist01 + dist23 + min(dist02, dist13),
-                   dist02 + dist13 + min(dist01, dist23),
-                   dist03 + dist12 + min(dist01, dist23))
+
+
+
+        return min(dist01 + dist23 + min(dist13, dist12),
+                   dist02 + dist13 + min(dist12, dist23),
+                   dist03 + dist12 + min(dist23, dist13))
 
 class AStarCornersAgent(SearchAgent):
     "A SearchAgent for FoodSearchProblem using A* and your foodHeuristic"
@@ -529,7 +542,11 @@ class AStarFoodSearchAgent(SearchAgent):
         self.searchFunction = lambda prob: search.aStarSearch(prob, foodHeuristic)
         self.searchType = FoodSearchProblem
 
+
+import pdb
 def foodHeuristic(state, problem):
+    # idea 1 - if there is food, explore around the area more
+    # if there is less food in the area go deeper. 
     """
     Your heuristic for the FoodSearchProblem goes here.
 
@@ -556,10 +573,106 @@ def foodHeuristic(state, problem):
     value, try: problem.heuristicInfo['wallCount'] = problem.walls.count()
     Subsequent calls to this heuristic can access
     problem.heuristicInfo['wallCount']
+
+    - lack of info definintion of states - need to know that state encodes the minium distance
+    - we need a way in our state fucntion for our heuristic to encode the true distance as much as possible.
+    - this is done thorugh computing a computationally easy path to getting to the solutoin.
+    - figure out ways of approximating the solution by estimating other metrics
+    - framed as a find closest distance problem - if i have a *simple way* of computing something very complex, as close as possible, then
+     I will have an estimate on how big the path it is to determine when to queue it. If I go over I will overshadow. 
+
+    - 
     """
+
     position, foodGrid = state
     "*** YOUR CODE HERE ***"
-    return 0
+
+    # Start with greedy heuristic
+    startGameState = problem.startingGameState
+
+
+
+    # Obtain top right most point and bottom rightmost point
+    # Obtain the left most bottom point and ttopmost right point. 
+    # compute the mahattan distances.
+
+
+    position = state[0]
+    foodList = foodGrid.asList()
+
+    
+    if len(foodList) == 0: 
+        return 0 
+    if len(foodList) == 1: 
+        nearest_food_distance = min(manhattan_distance(position, food) for food in foodList)
+
+        return nearest_food_distance
+    
+
+
+    # not ideal but helps to pass the non-triviality test. 
+    #if len(foodGrid) == 1: 
+    #    return 1e-1
+
+
+    # Employ a greedy strategy trying to find the closest distance to the position.
+
+
+
+    # Get min distance peddle
+
+
+    # I used ChatGPT to make this helper function
+    def find_extreme_point(points, direction='ul'):
+        if not points:
+            return None, float('inf')
+
+        x_compare, y_compare = {
+            'ul': (min, max),
+            'ur': (max, max),
+            'bl': (min, min),
+            'br': (max, min)
+        }.get(direction, (None, None))
+
+        if x_compare is None or y_compare is None:
+            raise ValueError("Invalid direction. Use 'ul', 'ur', 'bl', or 'br'.")
+
+        extreme_point = points[0]
+        for point in points[1:]:
+            if (x_compare(point[0], extreme_point[0]) == point[0] and 
+                y_compare(point[1], extreme_point[1]) == point[1]):
+                extreme_point = point
+            elif (x_compare(point[0], extreme_point[0]) == point[0] and 
+                point[1] == extreme_point[1]):
+                extreme_point = point
+            elif (point[0] == extreme_point[0] and 
+                y_compare(point[1], extreme_point[1]) == point[1]):
+                extreme_point = point
+
+        return extreme_point #abs(extreme_point[0]) + abs(extreme_point[1])
+    
+    extreme_points = [find_extreme_point(foodGrid, quadrant) for quadrant in ['ul', 'br', 'bl', 'ur']]
+
+    candidate_max_distance = manhattan_distance(extreme_points[0], extreme_points[1])
+    candidate_max_distance2 = manhattan_distance(extreme_points[2], extreme_points[3])
+
+
+    # estimate the distance - the longer the path, the less desirable to explore.
+    final_max_distance = max(candidate_max_distance, candidate_max_distance2)
+
+    nearest_food_distance = min(manhattan_distance(position, food) for food in foodGrid)
+
+
+    # score added alongside the cost branch, h should estimate as much as possibel alongside cost how much the whole branch is.
+    return max(final_max_distance, nearest_food_distance)
+    # determine mechanism behind foodlist being used, and why heuristics are bad
+
+
+
+
+
+
+   
 
 class ClosestDotSearchAgent(SearchAgent):
     "Search for all food using a sequence of searches"
@@ -589,7 +702,12 @@ class ClosestDotSearchAgent(SearchAgent):
         walls = gameState.getWalls()
         problem = AnyFoodSearchProblem(gameState)
 
-        "*** YOUR CODE HERE ***"
+        
+        return search.breadthFirstSearch(problem)
+
+        
+
+
         util.raiseNotDefined()
 
 class AnyFoodSearchProblem(PositionSearchProblem):
@@ -626,6 +744,13 @@ class AnyFoodSearchProblem(PositionSearchProblem):
         x,y = state
 
         "*** YOUR CODE HERE ***"
+
+
+        if (x,y) in self.food.asList(): 
+            return True
+        
+        return False
+
         util.raiseNotDefined()
 
 def mazeDistance(point1, point2, gameState):
